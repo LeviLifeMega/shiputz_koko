@@ -1,0 +1,550 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>צ'קליסט תיקונים - המתחם</title>
+<style>
+  :root{
+    --bg:#f4f5f7; --card:#fff; --ink:#1c1e21; --muted:#6b7280;
+    --line:#e3e5e8; --ok:#16a34a; --ok-soft:#eaf7ee; --warn:#d97706;
+    --shadow:0 1px 2px rgba(0,0,0,.06),0 4px 14px rgba(0,0,0,.05);
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;padding:0}
+  body{
+    background:var(--bg); color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Rubik,Arial,sans-serif;
+    font-size:16px; line-height:1.5; padding-bottom:40px;
+  }
+  .wrap{max-width:620px;margin:0 auto;padding:0 14px}
+
+  /* ---------- כותרת דביקה ---------- */
+  header{
+    position:sticky; top:0; z-index:30; background:rgba(244,245,247,.94);
+    backdrop-filter:blur(10px); border-bottom:1px solid var(--line); padding:12px 0 10px;
+  }
+  h1{margin:0;font-size:19px;font-weight:700;letter-spacing:-.01em}
+  .sub{margin:2px 0 0;font-size:13px;color:var(--muted)}
+  .bar{height:7px;background:#e6e8ec;border-radius:99px;overflow:hidden;margin-top:10px}
+  .bar>i{display:block;height:100%;width:0;background:var(--ok);border-radius:99px;transition:width .35s ease}
+  .meta{display:flex;justify-content:space-between;align-items:center;margin-top:7px;font-size:12.5px;color:var(--muted)}
+  .dot{display:inline-block;width:7px;height:7px;border-radius:99px;background:var(--muted);margin-left:6px;vertical-align:middle}
+  .dot.on{background:var(--ok)} .dot.busy{background:var(--warn)} .dot.off{background:#dc2626}
+
+  /* ---------- קומה ---------- */
+  .floor{margin:22px 0 10px;display:flex;align-items:baseline;gap:9px}
+  .floor h2{margin:0;font-size:16px;font-weight:700}
+  .floor span{font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}
+
+  /* ---------- משימה ---------- */
+  .task{
+    display:flex;gap:12px;align-items:center;background:var(--card);
+    border:1px solid var(--line);border-radius:14px;padding:10px;
+    margin-bottom:9px;box-shadow:var(--shadow);transition:background .2s,border-color .2s;
+  }
+  .task.done{background:var(--ok-soft);border-color:#c9e9d4}
+  .task.done .title{color:var(--muted);text-decoration:line-through;text-decoration-thickness:1.5px}
+
+  .thumbwrap{position:relative;flex:0 0 64px;width:64px;height:64px}
+  .thumb{
+    width:64px;height:64px;border-radius:10px;object-fit:cover;
+    background:#e9ebef;border:1px solid var(--line);cursor:zoom-in;display:block;
+  }
+  .thumb.none{display:flex;align-items:center;justify-content:center;font-size:22px;color:#aab;cursor:default}
+  .badge{
+    position:absolute;bottom:-4px;left:-4px;background:#1c1e21;color:#fff;
+    font-size:11px;font-weight:600;line-height:1;padding:3px 6px;border-radius:99px;
+    border:2px solid var(--card);pointer-events:none;
+  }
+
+  .txt{flex:1;min-width:0}
+  .title{font-size:15.5px;font-weight:600;overflow-wrap:anywhere}
+  .title.pending{color:var(--warn)}
+  .where{font-size:13px;color:var(--muted);margin-top:1px;overflow-wrap:anywhere}
+  .task.done .where{opacity:.55}
+
+  /* צ'קבוקס גדול לאצבע */
+  .box{
+    flex:0 0 34px;width:34px;height:34px;border-radius:9px;border:2px solid #cdd2da;
+    background:#fff;cursor:pointer;position:relative;transition:all .18s ease;
+  }
+  .box::after{
+    content:"";position:absolute;inset:0;margin:auto;width:9px;height:16px;
+    border:solid #fff;border-width:0 3px 3px 0;transform:rotate(45deg) scale(.4) translateY(-1px);
+    opacity:0;transition:all .18s ease;
+  }
+  .box[aria-checked="true"]{background:var(--ok);border-color:var(--ok)}
+  .box[aria-checked="true"]::after{opacity:1;transform:rotate(45deg) scale(1) translateY(-1px)}
+  body.viewonly .box{cursor:default;opacity:.85}
+
+  /* ---------- הגדלת תמונה ---------- */
+  #lb{position:fixed;inset:0;background:rgba(0,0,0,.94);display:none;z-index:100;overflow-y:auto}
+  #lb.on{display:block}
+  #lb .inner{min-height:100%;display:flex;flex-direction:column;align-items:center;
+             justify-content:center;gap:12px;padding:56px 14px 24px}
+  #lb img{max-width:100%;border-radius:10px;display:block}
+  #lb .cap{color:#fff;font-size:14.5px;text-align:center;max-width:600px}
+  #lb .x{position:fixed;top:12px;left:16px;color:#fff;font-size:36px;line-height:1;cursor:pointer;z-index:2}
+
+  .foot{text-align:center;color:var(--muted);font-size:12.5px;margin-top:26px}
+  .banner{
+    background:#fff7ed;border:1px solid #fed7aa;color:#9a3412;border-radius:11px;
+    padding:9px 12px;font-size:13.5px;margin-top:12px;display:none;
+  }
+  .banner.on{display:block}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap">
+    <h1>צ'קליסט תיקונים - המתחם</h1>
+    <p class="sub">מסמנים V אחרי שסיימו. אפשר ללחוץ על התמונה כדי להגדיל.</p>
+    <div class="bar"><i id="barFill"></i></div>
+    <div class="meta">
+      <span id="count">0 מתוך 0 הושלמו</span>
+      <span><span class="dot" id="dot"></span><span id="syncTxt">מתחבר...</span></span>
+    </div>
+    <div class="banner" id="banner"></div>
+  </div>
+</header>
+
+<main class="wrap" id="list"></main>
+
+<p class="foot">הסימונים נשמרים אוטומטית. אפשר לסגור את הדף ולחזור.</p>
+
+<div id="lb"><span class="x">&times;</span><div class="inner"></div></div>
+
+<script>
+/* =========================================================
+   1. רשימת המשימות
+   ---------------------------------------------------------
+   floor  : 1 או 2
+   id     : מזהה קבוע וייחודי. אסור לשנות אחרי שהצבעי התחיל,
+            כי הסימון נצמד למזהה הזה.
+   title  : התיאור שהצבעי רואה
+   photos : רשימת נתיבי תמונות. אפשר יותר מאחת לאותה משימה.
+            רשימה ריקה = בלי תמונה.
+   ========================================================= */
+const TASKS = [
+  {floor:1, id:'f1-01', title:'לצבוע בשחור',
+   where:'הפס השחור בתחתית הקיר הלבן, מעל רצפת הפרקט ליד המדרגות',
+   photos:['photos/f1-01.jpg']},
+
+  {floor:1, id:'f1-02', title:'להוסיף פלטת מתכת נוספת ולסגור את החור',
+   where:'סף הכניסה, ליד שטיח הכניסה ופס האלומיניום',
+   photos:['photos/f1-02.jpg']},
+
+  {floor:1, id:'f1-03', title:'למלא רובה בצבע אפור',
+   where:'הפינה בין הקיר האפור הכהה לרצפת הבטון בחוץ, ליד הדלפק האפור',
+   photos:['photos/f1-03a.jpg','photos/f1-03b.jpg']},
+
+  {floor:1, id:'f1-04', title:'שיוף וצביעה',
+   where:'הצינור השחור בפינה הלבנה, בכניסה למעלה, איפה שהייתה נזילה',
+   photos:['photos/f1-04.jpg']},
+
+  {floor:1, id:'f1-05', title:'לסדר סדקים וצביעה',
+   where:'הקיר הלבן ליד הצינור הירוק בחוץ, מאחורי הצמחייה',
+   photos:['photos/f1-05.jpg']},
+
+  {floor:1, id:'f1-06', title:'למלא סדקים וצביעה',
+   where:'הקיר הלבן בין מוטות המעקה השחורים, ליד מדרגות העץ',
+   photos:['photos/f1-06.jpg']},
+
+  {floor:1, id:'f1-07', title:'ממתין לפירוט',
+   where:'סף המרפסת מבטון, בין דלתות הזכוכית',
+   photos:['photos/f1-07.jpg']},
+
+  {floor:1, id:'f1-08', title:'לסדר עם שפכטל וצבע',
+   where:'העמוד הלבן שצמוד לקיר עם הכיתוב',
+   photos:['photos/f1-08.jpg']},
+
+  {floor:1, id:'f1-09', title:'למלא בשפכטל ולצבוע בצבע אפור',
+   where:'שפת המדרגה השבורה במדרגות האבן, ליד המעקה השחור והצמחייה',
+   photos:['photos/f1-09.jpg']},
+
+  {floor:1, id:'f1-10', title:'ממתין לפירוט',
+   where:'העמוד הלבן עם הפגם',
+   photos:['photos/f1-10.jpg']},
+
+  {floor:1, id:'f1-11', title:'למלא את הסדקים וצביעת הקיר',
+   where:'הסדק בקיר הלבן מתחת למעקה האלכסוני של המדרגות',
+   photos:['photos/f1-11.jpg']},
+
+  {floor:1, id:'f1-12', title:'לחבר את השקעים לקיר בשפכטל או בסיליקון לבן, ולצבוע את הקיר סביבם',
+   where:'שלושת השקעים הבולטים מהקיר בקומה הראשונה',
+   photos:['photos/f1-12a.jpg','photos/f1-12b.jpg','photos/f1-12c.jpg']},
+
+  {floor:1, id:'f1-13', title:'ממתין לפירוט',
+   where:'הרווח עם הבידוד החשוף בין הקיר למסגרת הזכוכית',
+   photos:['photos/f1-13a.jpg','photos/f1-13b.jpg']},
+
+  /* ===================== קומה שנייה ===================== */
+
+  {floor:2, id:'f2-01', title:'שפכטל ולמלא בגוון של הדק',
+   where:'בסיס שני העמודים הטורקיז, על רצפת הפרקט',
+   photos:['photos/f2-01.jpg']},
+
+  {floor:2, id:'f2-02', title:'לסדר סדקים וצביעה',
+   where:'הפינה הלבנה ליד החלון עם המסגרת הכחולה, ליד המדרגות למעלה',
+   photos:['photos/f2-02.jpg']},
+
+  {floor:2, id:'f2-03', title:'ממתין לפירוט',
+   where:'העמודים הלבנים עם הסדקים האנכיים',
+   photos:['photos/f2-03.jpg']},
+
+  {floor:2, id:'f2-04', title:'לצבוע את הצינור באדום ואת הקיר בלבן',
+   where:'הצינור האדום שנכנס לקיר הלבן, מעל הדלת השחורה',
+   photos:['photos/f2-04.jpg']},
+
+  {floor:2, id:'f2-05', title:'לסדר סדקים',
+   where:'פינת התקרה מעל החלון הגדול, בתוך הפנים ליד השירותים',
+   photos:['photos/f2-05.jpg']},
+
+  {floor:2, id:'f2-06', title:'ממתין לפירוט',
+   where:'הסדק האנכי בעמוד הלבן ליד החלון, לצד קיר השיש הכהה',
+   photos:['photos/f2-06.jpg']},
+
+  {floor:2, id:'f2-07', title:'לשייף ולצבוע',
+   where:'העמוד הלבן מאחורי העציץ הגדול ליד השירותים',
+   photos:['photos/f2-07.jpg']},
+
+  {floor:2, id:'f2-08', title:'לסדר את הדק',
+   where:'הדק מאחורי העציץ האפור ליד השירותים',
+   photos:['photos/f2-08.jpg']},
+
+  {floor:2, id:'f2-09', title:'ממתין לפירוט',
+   where:'הספרינקלר בתקרה הלבנה',
+   photos:['photos/f2-09.jpg']},
+
+  {floor:2, id:'f2-10', title:'לסדר את המכסה ואת הסדקים',
+   where:'התקרה הלבנה ליד מצלמת הכיפה והספרינקלר',
+   photos:['photos/f2-10.jpg']},
+
+  {floor:2, id:'f2-11', title:'לסדר סדקים ולצבוע',
+   where:'התקרה עם הצנרת האפורה, מעל הציור של התוכי הכחול',
+   photos:['photos/f2-11.jpg']},
+
+  {floor:2, id:'f2-12', title:'לסדר את הסדק ולצבוע',
+   where:'הסדק בין תקרת הבטון לקיר, מעל מנורת הרצפה',
+   photos:['photos/f2-12.jpg']},
+
+  {floor:2, id:'f2-13', title:'לסדר את הסדק וצביעה מקצועית',
+   where:'חדר שולחן, מסביב לצינור הצהוב שיורד מהתקרה',
+   photos:['photos/f2-13.jpg']},
+
+  {floor:2, id:'f2-14', title:'לסדר קילופים וצביעה מקצועית',
+   where:'הקיר מסביב לשני לוחות המזגנים',
+   photos:['photos/f2-14.jpg']},
+
+  {floor:2, id:'f2-15', title:'לצבוע את הלבן והמבריק',
+   where:'ליד הצינור האדום והצינור הטורקיז',
+   photos:['photos/f2-15.jpg']},
+
+  {floor:2, id:'f2-16', title:'להדביק ולמלא את הפרקט',
+   where:'הפרקט במטבח מתחת לשטיח, ליד הארון השחור',
+   photos:['photos/f2-16.jpg']},
+
+  {floor:2, id:'f2-17', title:'לסגור את הפרקט',
+   where:'הפרקט ליד הפח השחור והעמוד הטורקיז',
+   photos:['photos/f2-17.jpg']},
+
+  {floor:2, id:'f2-18', title:'לסדר את הפרקט',
+   where:'הפרקט ליד דלת הזכוכית של חדר חלון',
+   photos:['photos/f2-18.jpg']},
+
+  {floor:2, id:'f2-19', title:'צביעה',
+   where:'התקרה בחדר חלון, ליד קיר הצמחייה',
+   photos:['photos/f2-19.jpg']},
+
+  {floor:2, id:'f2-20', title:'לשים פאנל ברצפה',
+   where:'לאורך הקיר בחדר חלון, ליד השקע',
+   photos:['photos/f2-20.jpg']},
+
+  {floor:2, id:'f2-21', title:'לסדר ולצבוע את הסדק',
+   where:'הסדק בין תקרת הבטון לקיר הלבן, ליד החלון, מעל העץ',
+   photos:['photos/f2-21.jpg']},
+
+  {floor:2, id:'f2-22', title:'לסדר את הסדק',
+   where:'הסדק האנכי בקיר מעל המחסן, מתחת למצלמה ולסירנה האדומה',
+   photos:['photos/f2-22.jpg']},
+
+  {floor:2, id:'f2-23', title:'לסגור את החור',
+   where:'הפינה בין הקיר הלבן לקיר הטורקיז, בצד המדפסת',
+   photos:['photos/f2-23.jpg']},
+
+  {floor:2, id:'f2-24', title:'לשים פאנל ברצפה',
+   where:'לאורך הקיר הירוק במטבח, על רצפת הפרקט',
+   photos:['photos/f2-24.jpg']},
+
+  {floor:2, id:'f2-25', title:'לסיים לצבוע את הקיר',
+   where:'הקיר הירוק הגדול מתחת למנורות התלויות',
+   photos:['photos/f2-25.jpg']},
+
+  {floor:2, id:'f2-26', title:'לחבר שקע חשמל',
+   where:'ליד הצינור הטורקיז, מתחת לברז האדום',
+   photos:['photos/f2-26.jpg']},
+
+  {floor:2, id:'f2-27', title:'לסגור את החור',
+   where:'הפינה ליד הצינור הצהוב, מעל המצלמה',
+   photos:['photos/f2-27.jpg']},
+
+  {floor:2, id:'f2-28', title:'כיסוי ספרינקלר',
+   where:'הספרינקלר בתקרה מאחורי הווילון',
+   photos:['photos/f2-28.jpg']},
+
+  {floor:2, id:'f2-29', title:'למלא סיליקון בכל הפס',
+   where:'הפס בין האריחים הלבנים לשיש, מעל הכיור במטבח',
+   photos:['photos/f2-29.jpg']},
+
+  /* ===== המשך ייכנס לכאן ===== */
+];
+
+const FLOOR_NAMES = {1:'קומה ראשונה', 2:'קומה שנייה'};
+
+/* =========================================================
+   2. סנכרון
+   ========================================================= */
+const KEY     = 'levilife-mitcham-tikunim-4f9a2c7b1e';
+const REMOTE  = 'https://textdb.dev/api/data/' + KEY;
+const LOCAL   = 'checklist:' + KEY;
+const POLL_MS = 15000;
+
+// מצב צפייה בלבד: להוסיף ?view לכתובת. מונע סימון בטעות.
+const VIEW_ONLY = new URLSearchParams(location.search).has('view');
+if (VIEW_ONLY) document.body.classList.add('viewonly');
+
+/* state = { "f1-01": {v:true, t:1234567890}, ... }
+   לכל פריט חותמת זמן משלו, ובמיזוג מנצח הסימון החדש יותר.
+   כך שני מכשירים פתוחים במקביל לא דורסים זה את זה. */
+let state = loadLocal();
+
+function loadLocal(){
+  try { return JSON.parse(localStorage.getItem(LOCAL)) || {}; }
+  catch { return {}; }
+}
+function saveLocal(){
+  try { localStorage.setItem(LOCAL, JSON.stringify(state)); } catch {}
+}
+function merge(incoming){
+  let changed = false;
+  for (const id in incoming){
+    const a = state[id], b = incoming[id];
+    if (!b || typeof b.t !== 'number') continue;
+    if (!a || b.t > a.t){ state[id] = b; changed = true; }
+  }
+  return changed;
+}
+
+/* ---- אינדיקטור מצב ---- */
+const dotEl = document.getElementById('dot');
+const txtEl = document.getElementById('syncTxt');
+const banEl = document.getElementById('banner');
+function setSync(cls, txt){ dotEl.className = 'dot ' + cls; txtEl.textContent = txt; }
+function setBanner(msg){
+  banEl.textContent = msg || '';
+  banEl.classList.toggle('on', !!msg);
+}
+const OFFLINE_MSG = 'אין חיבור לשרת כרגע. הסימונים שלך נשמרים במכשיר ויעלו אוטומטית כשהחיבור יחזור.';
+
+/* ---- משיכה מהשרת ---- */
+async function pull(){
+  try{
+    const res = await fetch(REMOTE + '?t=' + Date.now(), {cache:'no-store'});
+    if (!res.ok) throw new Error(res.status);
+    const raw = (await res.text()).trim();
+    if (raw){
+      const data = JSON.parse(raw);
+      if (data && data.items && merge(data.items)){ saveLocal(); render(); }
+    }
+    setSync('on', VIEW_ONLY ? 'מעודכן' : 'מסונכרן');
+    setBanner('');
+  }catch(e){
+    setSync('off', 'לא מחובר');
+    setBanner(OFFLINE_MSG);
+  }
+}
+
+/* ---- דחיפה לשרת, עם השהייה קצרה כדי לא להציף ---- */
+let pushTimer = null, pushing = false, pendingPush = false;
+function schedulePush(){
+  if (VIEW_ONLY) return;
+  setSync('busy', 'שומר...');
+  clearTimeout(pushTimer);
+  pushTimer = setTimeout(push, 700);
+}
+async function push(){
+  if (pushing){ pendingPush = true; return; }
+  pushing = true;
+  try{
+    const res = await fetch(REMOTE, {
+      method:'POST',
+      headers:{'Content-Type':'text/plain'},
+      body: JSON.stringify({items: state, updated: new Date().toISOString()})
+    });
+    if (!res.ok) throw new Error(res.status);
+    setSync('on', 'מסונכרן');
+    setBanner('');
+  }catch(e){
+    setSync('off', 'לא נשמר בענן');
+    setBanner(OFFLINE_MSG);
+    setTimeout(schedulePush, 20000); // ניסיון חוזר
+  }finally{
+    pushing = false;
+    if (pendingPush){ pendingPush = false; schedulePush(); }
+  }
+}
+
+/* =========================================================
+   3. בנייה והצגה
+   ========================================================= */
+const listEl = document.getElementById('list');
+
+function isDone(id){ return !!(state[id] && state[id].v); }
+
+function toggle(id){
+  if (VIEW_ONLY) return;
+  state[id] = {v: !isDone(id), t: Date.now()};
+  saveLocal();
+  render();
+  schedulePush();
+}
+
+function noPhoto(){
+  const d = document.createElement('div');
+  d.className = 'thumb none'; d.textContent = '🔧';
+  return d;
+}
+
+function buildThumb(task){
+  const wrap = document.createElement('div');
+  wrap.className = 'thumbwrap';
+  const list = task.photos || [];
+
+  if (!list.length){ wrap.appendChild(noPhoto()); return wrap; }
+
+  const img = document.createElement('img');
+  img.className = 'thumb';
+  img.src = list[0];
+  img.alt = task.title;
+  img.loading = 'lazy';
+  img.addEventListener('click', e => { e.stopPropagation(); openLightbox(task); });
+  img.addEventListener('error', () => img.replaceWith(noPhoto()));
+  wrap.appendChild(img);
+
+  if (list.length > 1){
+    const b = document.createElement('span');
+    b.className = 'badge';
+    b.textContent = list.length;
+    wrap.appendChild(b);
+  }
+  return wrap;
+}
+
+function build(){
+  const floors = [...new Set(TASKS.map(t => t.floor))].sort((a,b)=>a-b);
+  listEl.innerHTML = '';
+  for (const f of floors){
+    const head = document.createElement('div');
+    head.className = 'floor';
+    head.innerHTML = '<h2>' + (FLOOR_NAMES[f] || ('קומה ' + f)) +
+                     '</h2><span data-fc="' + f + '"></span>';
+    listEl.appendChild(head);
+
+    for (const t of TASKS.filter(x => x.floor === f)){
+      const row = document.createElement('div');
+      row.className = 'task';
+      row.dataset.id = t.id;
+
+      row.appendChild(buildThumb(t));
+
+      const txt = document.createElement('div');
+      txt.className = 'txt';
+
+      const ttl = document.createElement('div');
+      ttl.className = 'title' + (t.title === 'ממתין לפירוט' ? ' pending' : '');
+      ttl.textContent = t.title;
+      txt.appendChild(ttl);
+
+      if (t.where){
+        const whr = document.createElement('div');
+        whr.className = 'where'; whr.textContent = t.where;
+        txt.appendChild(whr);
+      }
+      row.appendChild(txt);
+
+      const box = document.createElement('div');
+      box.className = 'box';
+      box.setAttribute('role','checkbox');
+      box.setAttribute('tabindex','0');
+      box.setAttribute('aria-label', t.title + (t.where ? ' - ' + t.where : ''));
+      box.addEventListener('keydown', e => {
+        if (e.key === ' ' || e.key === 'Enter'){ e.preventDefault(); toggle(t.id); }
+      });
+      row.appendChild(box);
+
+      // הקשה בכל מקום בשורה מסמנת, חוץ מהתמונה שפותחת הגדלה
+      row.addEventListener('click', () => toggle(t.id));
+
+      listEl.appendChild(row);
+    }
+  }
+}
+
+function render(){
+  let total = 0, done = 0;
+  const per = {};
+  for (const t of TASKS){
+    const d = isDone(t.id);
+    total++; if (d) done++;
+    per[t.floor] = per[t.floor] || {t:0, d:0};
+    per[t.floor].t++; if (d) per[t.floor].d++;
+
+    const row = listEl.querySelector('.task[data-id="' + t.id + '"]');
+    if (row){
+      row.classList.toggle('done', d);
+      row.querySelector('.box').setAttribute('aria-checked', d ? 'true' : 'false');
+    }
+  }
+  for (const f in per){
+    const el = listEl.querySelector('[data-fc="' + f + '"]');
+    if (el) el.textContent = per[f].d + '/' + per[f].t;
+  }
+  document.getElementById('count').textContent = done + ' מתוך ' + total + ' הושלמו';
+  document.getElementById('barFill').style.width = total ? (done/total*100) + '%' : '0%';
+}
+
+/* ---- הגדלת תמונה, כולל כמה תמונות לאותה משימה ---- */
+const lb = document.getElementById('lb');
+const lbInner = lb.querySelector('.inner');
+function openLightbox(task){
+  lbInner.innerHTML = '';
+  const cap = document.createElement('div');
+  cap.className = 'cap';
+  cap.textContent = task.title + (task.where ? ' - ' + task.where : '');
+  lbInner.appendChild(cap);
+  for (const src of (task.photos || [])){
+    const im = document.createElement('img');
+    im.src = src; im.alt = task.title;
+    lbInner.appendChild(im);
+  }
+  lb.scrollTop = 0;
+  lb.classList.add('on');
+}
+lb.addEventListener('click', () => lb.classList.remove('on'));
+document.addEventListener('keydown', e => { if (e.key === 'Escape') lb.classList.remove('on'); });
+
+/* =========================================================
+   4. הפעלה
+   ========================================================= */
+build();
+render();
+pull();
+
+setInterval(pull, POLL_MS);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) pull(); });
+window.addEventListener('online', () => { pull(); if (!VIEW_ONLY) schedulePush(); });
+</script>
+</body>
+</html>
