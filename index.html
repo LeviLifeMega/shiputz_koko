@@ -321,7 +321,7 @@ const FLOOR_NAMES = {1:'קומה ראשונה', 2:'קומה שנייה'};
 const KEY     = 'levilife-mitcham-tikunim-4f9a2c7b1e';
 const REMOTE  = 'https://textdb.dev/api/data/' + KEY;
 const LOCAL   = 'checklist:' + KEY;
-const POLL_MS = 15000;
+const POLL_MS = 5000;
 
 // מצב צפייה בלבד: להוסיף ?view לכתובת. מונע סימון בטעות.
 const VIEW_ONLY = new URLSearchParams(location.search).has('view');
@@ -360,16 +360,20 @@ function setBanner(msg){
 }
 const OFFLINE_MSG = 'אין חיבור לשרת כרגע. הסימונים שלך נשמרים במכשיר ויעלו אוטומטית כשהחיבור יחזור.';
 
-/* ---- משיכה מהשרת ---- */
+/* ---- משיכה מהשרת ומיזוג לתוך המצב המקומי ---- */
+async function fetchAndMerge(){
+  const res = await fetch(REMOTE + '?t=' + Date.now(), {cache:'no-store'});
+  if (!res.ok) throw new Error(res.status);
+  const raw = (await res.text()).trim();
+  if (raw){
+    const data = JSON.parse(raw);
+    if (data && data.items && merge(data.items)){ saveLocal(); render(); }
+  }
+}
+
 async function pull(){
   try{
-    const res = await fetch(REMOTE + '?t=' + Date.now(), {cache:'no-store'});
-    if (!res.ok) throw new Error(res.status);
-    const raw = (await res.text()).trim();
-    if (raw){
-      const data = JSON.parse(raw);
-      if (data && data.items && merge(data.items)){ saveLocal(); render(); }
-    }
+    await fetchAndMerge();
     setSync('on', VIEW_ONLY ? 'מעודכן' : 'מסונכרן');
     setBanner('');
   }catch(e){
@@ -390,6 +394,10 @@ async function push(){
   if (pushing){ pendingPush = true; return; }
   pushing = true;
   try{
+    /* קריטי: קודם מושכים וממזגים את מה שכבר בענן, ורק אז דוחפים.
+       בלי זה, דחיפה של מכשיר אחד מוחקת את הסימונים של השני. */
+    try { await fetchAndMerge(); } catch(e){ /* אם המשיכה נכשלה, עדיין ננסה לדחוף */ }
+
     const res = await fetch(REMOTE, {
       method:'POST',
       headers:{'Content-Type':'text/plain'},
